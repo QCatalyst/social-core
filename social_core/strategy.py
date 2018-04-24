@@ -4,7 +4,7 @@ import hashlib
 
 from .utils import setting_name, module_member, PARTIAL_TOKEN_SESSION_NAME
 from .store import OpenIdStore, OpenIdSessionWrapper
-from .pipeline import DEFAULT_AUTH_PIPELINE, DEFAULT_DISCONNECT_PIPELINE
+from .pipeline import DEFAULT_AUTH_PIPELINE, DEFAULT_DISCONNECT_PIPELINE, DEFAULT_LOGOUT_PIPELINE
 from .pipeline.utils import partial_load, partial_store, partial_prepare
 
 
@@ -106,6 +106,9 @@ class BaseStrategy(object):
             DEFAULT_DISCONNECT_PIPELINE,
             backend
         )
+
+    def get_logout_pipeline(self):
+        return self.setting('LOGOUT_PIPELINE', DEFAULT_LOGOUT_PIPELINE)
 
     def random_string(self, length=12, chars=ALLOWED_CHARS):
         # Implementation borrowed from django 1.4

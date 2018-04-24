@@ -93,6 +93,11 @@ class SAMLIdentityProvider(object):
         return self.conf['url']
 
     @property
+    def slo_url(self):
+        """Get the SLO URL for this IdP"""
+        return self.conf['slo_url']
+    
+    @property
     def x509cert(self):
         """X.509 Public Key Certificate for this IdP"""
         return self.conf['x509cert']
@@ -105,6 +110,11 @@ class SAMLIdentityProvider(object):
             'entityId': self.entity_id,
             'singleSignOnService': {
                 'url': self.sso_url,
+                # python-saml only supports Redirect
+                'binding': 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect'
+            },
+            'singleLogoutService': {
+                'url': self.slo_url,
                 # python-saml only supports Redirect
                 'binding': 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect'
             },
@@ -125,6 +135,7 @@ class DummySAMLIdentityProvider(SAMLIdentityProvider):
             'dummy',
             entity_id='https://dummy.none/saml2',
             url='https://dummy.none/SSO',
+            slo_url='https://dummy.none/SLO',
             x509cert=''
         )
 
@@ -209,7 +220,7 @@ class SAMLAuth(BaseAuth):
                 'x509cert': self.setting('SP_PUBLIC_CERT'),
                 'privateKey': self.setting('SP_PRIVATE_KEY'),
             },
-            'strict': True,  # We must force strict mode - for security
+            'strict': self.setting('SP_SAML_RESTRICT_MODE', True)
         }
         config["security"].update(self.setting("SECURITY_CONFIG", {}))
         config["sp"].update(self.setting("SP_EXTRA", {}))
@@ -271,6 +282,16 @@ class SAMLAuth(BaseAuth):
         # URL.
         return auth.login(return_to=idp_name)
 
+    def logout_url(self):
+        """Get the URL for SLO"""
+        try:
+            idp_name = self.strategy.request_data()['idp']
+        except KeyError:
+            raise AuthMissingParameter(self, 'idp')
+        auth = self._create_saml_auth(idp=self.get_idp(idp_name))
+
+        return auth.logout(return_to=idp_name)
+
     def get_user_details(self, response):
         """Get user details like full name, email, etc. from the
         response - see auth_complete"""
@@ -314,11 +335,23 @@ class SAMLAuth(BaseAuth):
         kwargs.update({'response': response, 'backend': self})
         return self.strategy.authenticate(*args, **kwargs)
 
+    def logout_complete(self, *args, **kwargs):
+        idp_name = self.strategy.request_data()['RelayState']
+
+        idp = self.get_idp(idp_name)
+        auth = self._create_saml_auth(idp)
+        slo_url = auth.process_slo()
+
+        return slo_url
+
     def extra_data(self, user, uid, response, details=None, *args, **kwargs):
         return super(SAMLAuth, self).extra_data(user, uid,
                                                 response['attributes'],
                                                 details=details,
                                                 *args, **kwargs)
+
+    def end(self):
+        return self.strategy.redirect(self.logout_url())
 
     def _check_entitlements(self, idp, attributes):
         """

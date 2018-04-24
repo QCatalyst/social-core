@@ -64,7 +64,7 @@ requirements_all = requirements_openidconnect + \
 tests_requirements = tests_requirements + requirements_all
 
 setup(
-    name='social-auth-core',
+    name='social-auth-core-fork',
     version=read_version(),
     author='Matias Aguirre',
     author_email='matiasaguirre@gmail.com',

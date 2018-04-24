@@ -129,3 +129,26 @@ def do_disconnect(backend, user, association_id=None, redirect_name='next',
                 backend.setting('LOGIN_REDIRECT_URL')
         response = backend.strategy.redirect(url)
     return response
+
+
+def do_slo(backend, redirect_name='next', *args, **kwargs):
+    return backend.end()
+
+
+def do_complete_logout(backend, user=None, redirect_name='next',
+                       *args, **kwargs):
+    data = backend.strategy.request_data()
+
+    is_authenticated = user_is_authenticated(user)
+    user = is_authenticated and user or None
+
+    partial = partial_pipeline_data(backend, user, *args, **kwargs)
+    if partial:
+        xargs, xkwargs = partial
+        response = backend.continue_pipeline(*xargs, **xkwargs)
+    else:
+        response = backend.complete_logout(user=user, *args, **kwargs)
+
+    url = backend.setting('LOGOUT_REDIRECT_URL', '/')
+
+    return backend.strategy.redirect(url)
